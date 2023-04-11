@@ -1,3 +1,16 @@
+def create_cities_df(country, min_population, limit):
+
+  API_key = "YOUR KEY FOR NINJAS API"
+  cities = requests.get(f"https://api.api-ninjas.com/v1/city?country={country}&min_population={min_population}&limit={limit}", headers={'X-Api-Key': API_key})
+  cities_json = cities.json()
+  cities_df=pd.DataFrame(cities_json)
+  cities_df=cities_df.drop(columns="is_capital", axis=1)
+  cities_df.rename(columns={"name":"city"},inplace=True)
+  cities_df["city_country"]=cities_df["city"]+ ", "+cities_df["country"]
+  cities_df=cities_df.loc[:,["city_country", "latitude", "longitude", "population", "city", "country"]]
+  return cities_df
+  
+  
 def create_weather_df(city_list):
 
   API_key = 'YOUR OPENWEATHER API KEY'
@@ -25,6 +38,8 @@ def create_weather_df(city_list):
           wt_dict["humidity"].append(humidity)
           wt_dict["retrieved_at"]=now.strftime("%d/%m   %H:%M:%S")
   return pd.DataFrame(wt_dict)
+  
+  
   
 def create_arrivals_df(icaos):
 
@@ -64,15 +79,3 @@ def create_arrivals_df(icaos):
   arrivals_df['scheduled_arrival'] = arrivals_df['scheduled_arrival'].dt.strftime('%Y-%m-%d %H:%M:%S')
   arrivals_df['forecast_time'] = pd.to_datetime(arrivals_df['scheduled_arrival'], utc=True).dt.round('3H').dt.strftime('%Y-%m-%d %H:%M:%S')
   return arrivals_df
-  
-def create_cities_df(country, min_population, limit):
-
-  API_key = "YOUR KEY FOR NINJAS API"
-  cities = requests.get(f"https://api.api-ninjas.com/v1/city?country={country}&min_population={min_population}&limit={limit}", headers={'X-Api-Key': API_key})
-  cities_json = cities.json()
-  cities_df=pd.DataFrame(cities_json)
-  cities_df=cities_df.drop(columns="is_capital", axis=1)
-  cities_df.rename(columns={"name":"city"},inplace=True)
-  cities_df["city_country"]=cities_df["city"]+ ", "+cities_df["country"]
-  cities_df=cities_df.loc[:,["city_country", "latitude", "longitude", "population", "city", "country"]]
-  return cities_df
