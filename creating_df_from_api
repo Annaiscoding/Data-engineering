@@ -1,0 +1,78 @@
+def create_weather_df(city_list):
+
+  API_key = 'YOUR OPENWEATHER API KEY'
+  now = datetime.now()   #.astimezone(tz)
+  wt_dict={"city_country":[], "forecast_time":[], "temperature":[], "precipitation":[], "outlook":[], "windspeed":[], "clouds":[], "humidity":[], "retrieved_at":[]}
+  for city in city_list:
+      weather=requests.get(f"http://api.openweathermap.org/data/2.5/forecast?q={city}&appid={API_key}&units=metric")
+      weather_json=weather.json()
+      city_country = city+", DE"    
+      for i in range(len(weather_json["list"])):
+          time = weather_json["list"][i]["dt_txt"]
+          temp = weather_json["list"][i]["main"]["temp"]
+          precipitation = weather_json["list"][i]["weather"][0]["main"]
+          outlook = weather_json["list"][0]["weather"][0]["description"]
+          wind_speed = weather_json["list"][i]["wind"]["speed"]
+          clouds = weather_json["list"][i]["clouds"]["all"]
+          humidity = weather_json["list"][i]["main"]["humidity"]
+          wt_dict["city_country"].append(city_country)
+          wt_dict["forecast_time"].append(time)
+          wt_dict["temperature"].append(temp)
+          wt_dict["precipitation"].append(precipitation)
+          wt_dict["outlook"].append(outlook)
+          wt_dict["windspeed"].append(wind_speed)
+          wt_dict["clouds"].append(clouds)
+          wt_dict["humidity"].append(humidity)
+          wt_dict["retrieved_at"]=now.strftime("%d/%m   %H:%M:%S")
+  return pd.DataFrame(wt_dict)
+  
+def create_arrivals_df(icaos):
+
+  today = datetime.now().astimezone(timezone('Europe/Berlin')).date()
+  tomorrow = (today + timedelta(days=1))
+  arrivals_jsons=[]
+  list_for_df = []
+  icao_dict = {'EDDB': 'Berlin, DE', 'EDDH': 'Hamburg, DE', 'EDDW': 'Bremen, DE', 'EDDF': 'Frankfurt, DE', 'EDDM': 'Munich, DE', 'EDDK':'Cologne, DE'}
+
+  for icao in icaos:
+    times = [["00:00","11:59"],["12:00","23:59"]]
+
+    for time in times:
+      url = f"https://aerodatabox.p.rapidapi.com/flights/airports/icao/{icao}/{tomorrow}T{time[0]}/{tomorrow}T{time[1]}"
+      querystring = {"withLeg":"false","direction":"Arrival","withCancelled":"false","withCodeshared":"false","withCargo":"false","withPrivate":"false","withLocation":"false"}
+      headers = {
+        "X-RapidAPI-Key": "YOUR AERODATABOX API KEY",
+        "X-RapidAPI-Host": "aerodatabox.p.rapidapi.com"
+        }
+  
+      response = requests.request("GET", url, headers=headers, params=querystring)
+      arrivals_json=response.json()["arrivals"]
+      arrivals_jsons.append(arrivals_json)
+      for i in range (len(arrivals_json)):
+          arrival_dict = {}
+          arrival_dict['scheduled_arrival'] = arrivals_json[i]["movement"].get("scheduledTimeLocal", None)
+          arrival_dict['city_country'] = icao_dict[icao]
+          arrival_dict['from_city'] = arrivals_json[i]["movement"]["airport"].get('name', None)
+          arrival_dict['departure_airport'] = arrivals_json[i]["movement"]["airport"].get('iata', None)
+          arrival_dict["flight"] = arrivals_json[i].get("number", None)
+          arrival_dict['terminal'] = arrivals_json[i]["movement"].get("terminal", None)
+          arrival_dict['departure_icao'] = arrivals_json[i]["movement"]["airport"].get("icao", None)
+          arrival_dict['arrival_icao'] = icao
+          list_for_df.append(arrival_dict)
+  arrivals_df = pd.DataFrame(list_for_df)
+  arrivals_df['scheduled_arrival'] = pd.to_datetime(arrivals_df['scheduled_arrival'], utc=True)
+  arrivals_df['scheduled_arrival'] = arrivals_df['scheduled_arrival'].dt.strftime('%Y-%m-%d %H:%M:%S')
+  arrivals_df['forecast_time'] = pd.to_datetime(arrivals_df['scheduled_arrival'], utc=True).dt.round('3H').dt.strftime('%Y-%m-%d %H:%M:%S')
+  return arrivals_df
+  
+def create_cities_df(country, min_population, limit):
+
+  API_key = "YOUR KEY FOR NINJAS API"
+  cities = requests.get(f"https://api.api-ninjas.com/v1/city?country={country}&min_population={min_population}&limit={limit}", headers={'X-Api-Key': API_key})
+  cities_json = cities.json()
+  cities_df=pd.DataFrame(cities_json)
+  cities_df=cities_df.drop(columns="is_capital", axis=1)
+  cities_df.rename(columns={"name":"city"},inplace=True)
+  cities_df["city_country"]=cities_df["city"]+ ", "+cities_df["country"]
+  cities_df=cities_df.loc[:,["city_country", "latitude", "longitude", "population", "city", "country"]]
+  return cities_df
